@@ -1,0 +1,118 @@
+---
+title: "Prac. Mach. Learn. Project"
+author: "Jackson Little"
+date: "January 8, 2018"
+output: html_document
+---
+
+```{r}
+library(caret)
+library(rattle)
+library(reshape2)
+library(e1071)
+library(knitr)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(RColorBrewer)
+```
+
+##**Introduction**
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset
+
+The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+##**Project Goal**
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+##**Accessing,Loading, and Cleaning Data**
+```{r}
+trainlink <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testlink <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+trainingdat <- read.csv(url(trainlink), na.strings=c("NA","#DIV/0!",""))
+testingdat <- read.csv(url(testlink), na.strings=c("NA","#DIV/0!",""))
+```
+
+The data has a lot of chaff in it in the form of various superfluous columns with large numbers of blank or near 0 values so we need to remove those to simplify and clean the data. First the training set:
+
+```{r}
+ColumnPurge1 <- which(colSums(is.na(trainingdat) |trainingdat=="")>0.9*dim(trainingdat)[1]) 
+CleanedTrainData <- trainingdat[,-ColumnPurge1]
+CleanedTrainData <- CleanedTrainData[,-c(1:7)]
+dim(CleanedTrainData)
+```
+
+Now the testing set:
+
+```{r}
+ColumnPurge2 <- which(colSums(is.na(testingdat) |testingdat=="")>0.9*dim(testingdat)[1]) 
+CleanedTestData <- testingdat[,-ColumnPurge2]
+CleanedTestData <- CleanedTestData[,-1]
+dim(CleanedTestData)
+```
+
+
+We see that the overall volume of the data has shrunk significantly.Time to partition the data:
+
+```{r}
+set.seed(12345)
+inTrain <- createDataPartition(CleanedTrainData$classe, p=0.75, list=FALSE)
+PrimTraining <- CleanedTrainData[inTrain, ]
+PrimTesting <- CleanedTrainData[-inTrain, ]
+dim(PrimTraining); dim(PrimTesting)
+```
+
+We now have a cleaner, partitioned data with which to work. Two models will be run from the data: 
+1. A Classification Tree
+2. A Random Forest
+
+
+These models should help us predict the outcome:
+
+##**Predictions-Classificiation Tree**
+
+```{r}
+set.seed(12345)
+Tree1 <- rpart(classe ~ ., data = PrimTraining, method = "class")
+fancyRpartPlot(Tree1)
+```
+
+```{r}
+Tree1predictions <- predict(Tree1, PrimTesting, type = "class")
+confusetree1 <- confusionMatrix(Tree1predictions, PrimTesting$classe)
+confusetree1
+```
+We get a decent degree of accuracy with this chart but 72.3% still leaves nearly a 30% margin for the expected out of sample error. We need to compare this against the Random Forest model to determine if it performs any better than this model. 
+
+##**Predictions-Random Forests**
+```{r}
+set.seed(12345)
+Forest1 <- randomForest(classe ~ ., data=PrimTraining)
+ForestPredict1 <- predict(Forest1, PrimTesting, type = "class")
+confuseForest1 <- confusionMatrix(ForestPredict1, PrimTesting$classe)
+confuseForest1
+```
+
+What we see here are some extremely promising results. We see here that the accuracy rating is 99.49%, making just a 0.51% out of sample error This is in stark contrast to the nearly 30% out of sample error that we encountered with the decision tree above. At this point, with less than 1% in error, we can safely conclude that this model (Random Forest) is the ideal prediction model. 
+
+```{r}
+plot(Forest1)
+```
+
+##**Predictions from the Test Data**
+```{r}
+FinalPrediction <- predict(Forest1, testingdat, type = "class")
+
+FinalPrediction
+```
+
+
+
+
+
+
